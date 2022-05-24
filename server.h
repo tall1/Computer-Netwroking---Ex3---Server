@@ -7,12 +7,13 @@ typedef struct SocketState
 	int	recv;			// Receiving?
 	int	send;			// Sending?
 	int sendSubType;	// Sending sub-type
-	char buffer[128];
+	char buffer[MAX_SIZE_BUFF];
 	int len;
 }SocketState;
 
 const int TIME_PORT = 13711;
 const int MAX_SOCKETS = 60;
+const int MAX_SIZE_BUFF = 1024;
 const int EMPTY = 0;
 const int LISTEN = 1;
 const int RECEIVE = 2;
@@ -44,7 +45,7 @@ const char* httpMethods[] = { "OPTIONS", "GET", "HEAD", "PUT", "POST", "DELETE",
 const int httpMethodsLength[] = { 7, 3, 4, 3, 4, 6, 5 };
 
 void handleRequest(SocketState* socket);
-string prepareResponse(char* responseBuff, SocketState* socket);
+string prepareResponse(SocketState* socket);
 string optionsStringParse(SocketState* socket);
 string createGetOrHeadRespose(SocketState* socket);
 string putStringParse(SocketState* socket);

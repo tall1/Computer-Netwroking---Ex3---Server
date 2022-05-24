@@ -9,14 +9,14 @@ using namespace std;
 #include <fstream>
 #include "server.h"
 
-void main()
+int main()
 {
 	WSAData wsaData;
 
 	if (NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData))
 	{
 		cout << "Time Server: Error at WSAStartup()\n";
-		return;
+		return 0;
 	}
 
 	SOCKET listenSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -25,7 +25,7 @@ void main()
 	{
 		cout << "Time Server: Error at socket(): " << WSAGetLastError() << endl;
 		WSACleanup();
-		return;
+		return 0;
 	}
 
 	sockaddr_in serverService;
@@ -38,7 +38,7 @@ void main()
 		cout << "Time Server: Error at bind(): " << WSAGetLastError() << endl;
 		closesocket(listenSocket);
 		WSACleanup();
-		return;
+		return 0;
 	}
 
 	if (SOCKET_ERROR == listen(listenSocket, 5))
@@ -46,7 +46,7 @@ void main()
 		cout << "Time Server: Error at listen(): " << WSAGetLastError() << endl;
 		closesocket(listenSocket);
 		WSACleanup();
-		return;
+		return 0;
 	}
 	addSocket(listenSocket, LISTEN);
 
@@ -76,7 +76,7 @@ void main()
 		{
 			cout << "Time Server: Error at select(): " << WSAGetLastError() << endl;
 			WSACleanup();
-			return;
+			return 0;
 		}
 
 		for (int i = 0; i < MAX_SOCKETS && nfd > 0; i++)
@@ -116,24 +116,9 @@ void main()
 	cout << "Time Server: Closing Connection.\n";
 	closesocket(listenSocket);
 	WSACleanup();
+	return 0;
 }
 
-bool addSocket(SOCKET id, int what)
-{
-	for (int i = 0; i < MAX_SOCKETS; i++)
-	{
-		if (sockets[i].recv == EMPTY)
-		{
-			sockets[i].id = id;
-			sockets[i].recv = what;
-			sockets[i].send = IDLE;
-			sockets[i].len = 0;
-			socketsCount++;
-			return (true);
-		}
-	}
-	return (false);
-}
 
 void removeSocket(int index)
 {
@@ -173,6 +158,23 @@ void acceptConnection(int index)
 	return;
 }
 
+bool addSocket(SOCKET id, int what)
+{
+	for (int i = 0; i < MAX_SOCKETS; i++)
+	{
+		if (sockets[i].recv == EMPTY)
+		{
+			sockets[i].id = id;
+			sockets[i].recv = what;
+			sockets[i].send = IDLE;
+			sockets[i].len = 0;
+			socketsCount++;
+			return (true);
+		}
+	}
+	return (false);
+}
+
 void receiveMessage(int index)
 {
 	SOCKET msgSocket = sockets[index].id;
@@ -196,13 +198,13 @@ void receiveMessage(int index)
 	else
 	{
 		sockets[index].buffer[len + bytesRecv] = '\0'; //add the null-terminating to make it a string
-		cout << "Time Server: Recieved: " << bytesRecv << " bytes of \"" << &sockets[index].buffer[len] << "\" message.\n";
+		cout << "Time Server: Recieved: " << bytesRecv << " bytes of \n" << &sockets[index].buffer[len] << "\" message.\n";
 
 		sockets[index].len += bytesRecv;
 
 		if (sockets[index].len > 0)
 		{
-			handleRequest(&sockets[index]);
+			handleRequest(&(sockets[index]));
 		}
 	}
 }
@@ -210,37 +212,14 @@ void receiveMessage(int index)
 void sendMessage(int index)
 {
 	int bytesSent = 0;
-	char sendBuff[255];
+	char sendBuff[255] = { 0 };
 
 	SOCKET msgSocket = sockets[index].id;
-
-	// prepare message()...
-
-
-
-	if (sockets[index].sendSubType == SEND_TIME)
-	{
-		// Answer client's request by the current time string.
-
-		// Get the current time.
-		time_t timer;
-		time(&timer);
-		// Parse the current time to printable string.
-		strcpy(sendBuff, ctime(&timer));
-		sendBuff[strlen(sendBuff) - 1] = 0; //to remove the new-line from the created string
-	}
-	else if (sockets[index].sendSubType == SEND_SECONDS)
-	{
-		// Answer client's request by the current time in seconds.
-
-		// Get the current time.
-		time_t timer;
-		time(&timer);
-		// Convert the number to string.
-		_itoa((int)timer, sendBuff, 10);
-	}
+	string respond = prepareResponse(&(sockets[index]));
+	sprintf(sendBuff, "%s", respond.c_str());
 
 	bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
+
 	if (SOCKET_ERROR == bytesSent)
 	{
 		cout << "Time Server: Error at send(): " << WSAGetLastError() << endl;
@@ -257,17 +236,19 @@ void sendMessage(int index)
 // =================================================
 
 void handleRequest(SocketState* socket) {
+	socket->recv = IDLE;
 	socket->send = SEND;
 	for (int i = 0; i < amountOfHttpMethods; i++) {
 		if (strncmp(socket->buffer, httpMethods[i], httpMethodsLength[i]) == 0) {
 			socket->sendSubType = i;
+
 			return;
 		}
 	}
 	socket->sendSubType = OTHER;
 }
 
-string prepareResponse(char* responseBuff, SocketState* socket) {
+string prepareResponse(SocketState* socket) {
 	string response;
 	if (socket->sendSubType == OTHER) {
 		response = generateResponseHeader("400 Bad Request", 0);
@@ -294,7 +275,7 @@ string optionsStringParse(SocketState* socket)
 	return header;
 }
 
-string createGetOrHeadResponse(SocketState* socket)
+string createGetOrHeadRespose(SocketState* socket)
 {
 	string response;
 	ifstream fileName;
