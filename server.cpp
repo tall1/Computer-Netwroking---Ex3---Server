@@ -15,7 +15,7 @@ int main()
 
 	if (NO_ERROR != WSAStartup(MAKEWORD(2, 2), &wsaData))
 	{
-		cout << "Time Server: Error at WSAStartup()\n";
+		cout << "Server: Error at WSAStartup()\n";
 		return 0;
 	}
 
@@ -23,7 +23,7 @@ int main()
 
 	if (INVALID_SOCKET == listenSocket)
 	{
-		cout << "Time Server: Error at socket(): " << WSAGetLastError() << endl;
+		cout << "Server: Error at socket(): " << WSAGetLastError() << endl;
 		WSACleanup();
 		return 0;
 	}
@@ -35,7 +35,7 @@ int main()
 
 	if (SOCKET_ERROR == bind(listenSocket, (SOCKADDR*)&serverService, sizeof(serverService)))
 	{
-		cout << "Time Server: Error at bind(): " << WSAGetLastError() << endl;
+		cout << "Server: Error at bind(): " << WSAGetLastError() << endl;
 		closesocket(listenSocket);
 		WSACleanup();
 		return 0;
@@ -43,7 +43,7 @@ int main()
 
 	if (SOCKET_ERROR == listen(listenSocket, 5))
 	{
-		cout << "Time Server: Error at listen(): " << WSAGetLastError() << endl;
+		cout << "Server: Error at listen(): " << WSAGetLastError() << endl;
 		closesocket(listenSocket);
 		WSACleanup();
 		return 0;
@@ -74,7 +74,7 @@ int main()
 
 		if (nfd == SOCKET_ERROR)
 		{
-			cout << "Time Server: Error at select(): " << WSAGetLastError() << endl;
+			cout << "Server: Error at select(): " << WSAGetLastError() << endl;
 			WSACleanup();
 			return 0;
 		}
@@ -113,7 +113,7 @@ int main()
 	}
 
 	// Closing connections and Winsock.
-	cout << "Time Server: Closing Connection.\n";
+	cout << "Server: Closing Connection.\n";
 	closesocket(listenSocket);
 	WSACleanup();
 	return 0;
@@ -136,10 +136,10 @@ void acceptConnection(int index)
 	SOCKET msgSocket = accept(id, (struct sockaddr*)&from, &fromLen);
 	if (INVALID_SOCKET == msgSocket)
 	{
-		cout << "Time Server: Error at accept(): " << WSAGetLastError() << endl;
+		cout << "Server: Error at accept(): " << WSAGetLastError() << endl;
 		return;
 	}
-	cout << "Time Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
+	cout << "Server: Client " << inet_ntoa(from.sin_addr) << ":" << ntohs(from.sin_port) << " is connected." << endl;
 
 	//
 	// Set the socket to be in non-blocking mode.
@@ -147,7 +147,7 @@ void acceptConnection(int index)
 	unsigned long flag = 1;
 	if (ioctlsocket(msgSocket, FIONBIO, &flag) != 0)
 	{
-		cout << "Time Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
+		cout << "Server: Error at ioctlsocket(): " << WSAGetLastError() << endl;
 	}
 
 	if (addSocket(msgSocket, RECEIVE) == false)
@@ -184,7 +184,7 @@ void receiveMessage(int index)
 
 	if (SOCKET_ERROR == bytesRecv)
 	{
-		cout << "Time Server: Error at recv(): " << WSAGetLastError() << endl;
+		cout << "Server: Error at recv(): " << WSAGetLastError() << endl;
 		closesocket(msgSocket);
 		removeSocket(index);
 		return;
@@ -198,7 +198,7 @@ void receiveMessage(int index)
 	else
 	{
 		sockets[index].buffer[len + bytesRecv] = '\0'; //add the null-terminating to make it a string
-		cout << "Time Server: Recieved: " << bytesRecv << " bytes of \n" << &sockets[index].buffer[len] << "\" message.\n";
+		cout << "Server: Recieved: " << bytesRecv << " bytes of \n" << &sockets[index].buffer[len] << "\" message.\n";
 
 		sockets[index].len += bytesRecv;
 
@@ -216,36 +216,34 @@ void sendMessage(int index)
 
 	SOCKET msgSocket = sockets[index].id;
 	string respond = prepareResponse(&(sockets[index]));
+	sockets[index].len = 0; // Empty previous request.
 	sprintf(sendBuff, "%s", respond.c_str());
 
 	bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
 
-	if (SOCKET_ERROR == bytesSent)
-	{
-		cout << "Time Server: Error at send(): " << WSAGetLastError() << endl;
+	if (SOCKET_ERROR == bytesSent) {
+		cout << "Server: Error at send(): " << WSAGetLastError() << endl;
 		return;
 	}
 
-	cout << "Time Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \"" << sendBuff << "\" message.\n";
-	if (sockets[index].len == 0) {
-		sockets[index].send = IDLE;
-	}
+	cout << "Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \n" << sendBuff << "\ message.\n";
+	sockets[index].send = IDLE;
 }
 
 
 // =================================================
 
 void handleRequest(SocketState* socket) {
-	socket->recv = IDLE;
+	
 	socket->send = SEND;
+	socket->sendSubType = OTHER;
 	for (int i = 0; i < amountOfHttpMethods; i++) {
 		if (strncmp(socket->buffer, httpMethods[i], httpMethodsLength[i]) == 0) {
 			socket->sendSubType = i;
-
 			return;
 		}
 	}
-	socket->sendSubType = OTHER;
+
 }
 
 string prepareResponse(SocketState* socket) {
@@ -305,7 +303,7 @@ string putStringParse(SocketState* socket)
 {
 	string response;
 	string uri = uriExtractor(socket);
-	int retCode = putFile(socket, uri);
+	int retCode = putOrPostFile(socket, uri);
 	switch (retCode)
 	{
 	case 200:
@@ -330,7 +328,7 @@ string postStringParse(SocketState* socket)
 {
 	string response;
 	string uri = uriExtractor(socket);
-	int retCode = postFile(socket, uri);
+	int retCode = putOrPostFile(socket, uri);
 	switch (retCode)
 	{
 	case 200:
@@ -450,70 +448,50 @@ void removeLastRequestFromBuffer(SocketState* socket)
 	memset(&(socket->buffer)[socket->len], '\0', SIZE_OF_BUFFER_ARRAY - socket->len);
 }
 
-int putFile(SocketState* socket, string& filename)
-{
-	int retCode = 200;//ok	
-	ofstream outputFile;
-	outputFile.open(filename, ios::in);
-
-	if (!outputFile.is_open())
-	{
-		outputFile.open(filename, ios::trunc);
-		retCode = 201;//created
-	}
-
-	if (!outputFile.is_open())
-	{
-		cout << "HTTP/text Server: Error writing file to local storage: " << WSAGetLastError() << endl;
-		return 0;//error
-	}
-
-	string bodyContent = ((string)(socket->buffer)).substr(((string)(socket->buffer)).find("\r\n\r\n") + 4, socket->len);
-
-	if (bodyContent.length() == 0)
-	{
-		retCode = 204; //no content
-	}
-	else
-	{
-		outputFile << bodyContent; // change...
-	}
-
-	outputFile.close();
-	return retCode;
-}
-
-int postFile(SocketState* socket, string& filename)
-{
-	int retCode = 200;//ok	
+int putOrPostFile(SocketState* socket, string& filename) {
+	int retCode = 200; // Ok	
 	ofstream outPutFile;
-	outPutFile.open(filename, ios::in);
 
-	if (!outPutFile.is_open())
-	{
-		outPutFile.open(filename, ios::trunc);
-		retCode = 201;//created
+	if (!checkFileExists(filename)) {
+		retCode = 201; // Created
+	}
+	if (socket->sendSubType == PUT) {
+		outPutFile.open(filename); // Truncation
+	}
+	else { // == POST
+		outPutFile.open(filename, std::fstream::in | std::fstream::out | std::fstream::app); // Append
 	}
 
-	if (!outPutFile.is_open())
-	{
-		cout << "HTTP Server: Error writing file to local storage: " << WSAGetLastError() << endl;
-		return 0;//error
+	if (!outPutFile.is_open())	{
+		cout << "HTTP/text Server: Error writing file to local storage: " << WSAGetLastError() << endl;
+		return 0; // Error
 	}
 
 	string bodyContent = ((string)(socket->buffer)).substr(((string)(socket->buffer)).find("\r\n\r\n") + 4, socket->len);
 
 	if (bodyContent.length() == 0)
 	{
-		retCode = 204; //no content
+		retCode = 204; // No content
 	}
-	else
-	{
+	else {
 		outPutFile << bodyContent;
 	}
 
 	outPutFile.close();
 	return retCode;
+}
+
+bool checkFileExists(string& fname) {
+	ifstream ifile;
+	ifile.open(fname);
+	if (ifile) {
+		ifile.close();
+		return true;
+	}
+	else {
+		ifile.close();
+		return false;
+	}
 }
 
 void addFileToString(ifstream& fileName, string& header)

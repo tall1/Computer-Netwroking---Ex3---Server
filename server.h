@@ -1,16 +1,6 @@
 #pragma once
 #include <winsock2.h>
 
-typedef struct SocketState
-{
-	SOCKET id;			// Socket handle
-	int	recv;			// Receiving?
-	int	send;			// Sending?
-	int sendSubType;	// Sending sub-type
-	char buffer[MAX_SIZE_BUFF];
-	int len;
-}SocketState;
-
 const int TIME_PORT = 13711;
 const int MAX_SOCKETS = 60;
 const int MAX_SIZE_BUFF = 1024;
@@ -21,6 +11,18 @@ const int IDLE = 3;
 const int SEND = 4;
 const int SEND_TIME = 1;
 const int SEND_SECONDS = 2;
+
+
+typedef struct SocketState
+{
+	SOCKET id;			// Socket handle
+	int	recv;			// Receiving?
+	int	send;			// Sending?
+	int sendSubType;	// Sending sub-type
+	char buffer[MAX_SIZE_BUFF];
+	int len;
+}SocketState;
+
 
 SocketState sockets[MAX_SOCKETS] = { 0 };
 int socketsCount = 0;
@@ -57,8 +59,8 @@ string generateResponseHeader(const char* status, int content_length);
 string uriExtractor(SocketState* socket);
 int lenOfFile(ifstream& fileToCheck);
 void removeLastRequestFromBuffer(SocketState* socket);
-int putFile(SocketState* socket, string& filename);
-int postFile(SocketState* socket, string& filename);
+int putOrPostFile(SocketState* socket, string& filename);
+bool checkFileExists(string& fname);
 void addFileToString(ifstream& fileName, string& header);
 
 const responseFunction responseFunctionsArr[amountOfHttpMethods] = {
