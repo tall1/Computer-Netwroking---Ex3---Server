@@ -218,7 +218,7 @@ void sendMessage(int index)
 	string respond = prepareResponse(&(sockets[index]));
 	sockets[index].len = 0; // Empty previous request.
 	sprintf(sendBuff, "%s", respond.c_str());
-
+	
 	bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
 
 	if (SOCKET_ERROR == bytesSent) {
@@ -289,8 +289,7 @@ string createGetOrHeadRespose(SocketState* socket)
 		cout << "The file " << uri << " is OK" << endl;
 		response = generateResponseHeader("200 OK", lenOfFile(fileName));
 
-		if (socket->sendSubType == GET)
-		{
+		if (socket->sendSubType == GET)	{
 			addFileToString(fileName, response);
 		}
 	}
@@ -499,11 +498,16 @@ void addFileToString(ifstream& fileName, string& header)
 	if (fileName.is_open())
 	{
 		string fileContent;
+		char prevChar = 0;
 		char currentChar = fileName.get();
-		while (currentChar != EOF)
-		{
+		while (currentChar != EOF)		{
 			fileContent.push_back(currentChar);
+			prevChar = currentChar;
 			currentChar = fileName.get();
+		}
+		size_t offset = fileContent.length() - 2; //*****
+		if (fileContent.substr(offset) == "\r\n") {
+			fileContent = fileContent.erase(offset);
 		}
 		header.append(fileContent);
 	}
