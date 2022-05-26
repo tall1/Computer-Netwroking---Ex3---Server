@@ -57,11 +57,9 @@ string traceStringParse(SocketState* socket);
 
 string generateResponseHeader(const char* status, int content_length);
 string uriExtractor(SocketState* socket);
-int lenOfFile(ifstream& fileToCheck);
-void removeLastRequestFromBuffer(SocketState* socket);
 int putOrPostFile(SocketState* socket, string& filename);
 bool checkFileExists(string& fname);
-void addFileToString(ifstream& fileName, string& header);
+void copyFileContent2String(ifstream& inFile, string& str);
 
 const responseFunction responseFunctionsArr[amountOfHttpMethods] = {
 	optionsStringParse ,

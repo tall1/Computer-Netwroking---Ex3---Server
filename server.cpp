@@ -216,7 +216,7 @@ void sendMessage(int index)
 
 	SOCKET msgSocket = sockets[index].id;
 	string respond = prepareResponse(&(sockets[index]));
-	sockets[index].len = 0; // Empty previous request.
+	sockets[index].len = 0;
 	sprintf(sendBuff, "%s", respond.c_str());
 	
 	bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
@@ -257,8 +257,7 @@ string prepareResponse(SocketState* socket) {
 	return response;
 }
 
-string optionsStringParse(SocketState* socket)
-{
+string optionsStringParse(SocketState* socket) {
 	time_t timeRightNow;
 	string header("HTTP/1.1 ");
 	header.append("200 OK");
@@ -273,8 +272,7 @@ string optionsStringParse(SocketState* socket)
 	return header;
 }
 
-string createGetOrHeadRespose(SocketState* socket)
-{
+string createGetOrHeadRespose(SocketState* socket) {
 	string response;
 	ifstream fileName;
 	string uri = uriExtractor(socket);
@@ -287,19 +285,18 @@ string createGetOrHeadRespose(SocketState* socket)
 	else
 	{
 		cout << "The file " << uri << " is OK" << endl;
-		response = generateResponseHeader("200 OK", lenOfFile(fileName));
-
-		if (socket->sendSubType == GET)	{
-			addFileToString(fileName, response);
-		}
+		string fileContent = "";
+		copyFileContent2String(fileName, fileContent);
+		response = generateResponseHeader("200 OK", fileContent.length());
+		if (socket->sendSubType == GET) {
+			response.append(fileContent);
+		} 
 	}
-
 	fileName.close();
 	return response;
 }
 
-string putStringParse(SocketState* socket)
-{
+string putStringParse(SocketState* socket) {
 	string response;
 	string uri = uriExtractor(socket);
 	int retCode = putOrPostFile(socket, uri);
@@ -323,8 +320,7 @@ string putStringParse(SocketState* socket)
 	return response;
 }
 
-string postStringParse(SocketState* socket)
-{
+string postStringParse(SocketState* socket) {
 	string response;
 	string uri = uriExtractor(socket);
 	int retCode = putOrPostFile(socket, uri);
@@ -348,34 +344,28 @@ string postStringParse(SocketState* socket)
 	return response;
 }
 
-string deleteStringParse(SocketState* socket)
-{
+string deleteStringParse(SocketState* socket) {
 	string response;
 	fstream fileToDelete;
 	string uri = uriExtractor(socket);
 	fileToDelete.open(uri);
-	if (fileToDelete.is_open())
-	{
+	if (fileToDelete.is_open())	{
 		fileToDelete.close();
-		if (remove(uri.c_str()) == 0)
-		{
+		if (remove(uri.c_str()) == 0) {
 			response = generateResponseHeader("200 OK", 0);
 		}
-		else
-		{
+		else {
 			response = generateResponseHeader("500 Internal Server Error", 0);
 		}
 	}
-	else
-	{
+	else {
 		response = generateResponseHeader("404 Not Found", 0);
 	}
 
 	return response;
 }
 
-string traceStringParse(SocketState* socket)
-{
+string traceStringParse(SocketState* socket) {
 	string response;
 	string bodyContent(socket->buffer);
 	response = generateResponseHeader("200 OK", bodyContent.length());
@@ -383,8 +373,7 @@ string traceStringParse(SocketState* socket)
 	return response;
 }
 
-string generateResponseHeader(const char* status, int content_length)
-{
+string generateResponseHeader(const char* status, int content_length) {
 	time_t timeRightNow;
 	string header("HTTP/1.1 ");
 	header.append(status);
@@ -412,41 +401,6 @@ string uriExtractor(SocketState* socket)
 	return uri;
 }
 
-int lenOfFile(ifstream& fileToCheck)
-{
-	int length = 0;
-	int newLinesCounter = -1;
-
-	if (fileToCheck.is_open())
-	{
-		fileToCheck.seekg(0, fileToCheck.beg);
-		fileToCheck.seekg(0, fileToCheck.end);
-		length = fileToCheck.tellg();
-		fileToCheck.seekg(0, fileToCheck.beg);
-		char readBuff[512];
-
-		while (fileToCheck.getline(readBuff, 512))
-		{
-			++newLinesCounter;
-		}
-
-		length -= newLinesCounter;
-		fileToCheck.clear();
-		fileToCheck.seekg(fileToCheck.beg);
-	}
-
-	return length;
-}
-
-void removeLastRequestFromBuffer(SocketState* socket)
-{
-	int LenOflastRequest = ((string)(socket->buffer)).length();
-	memcpy((socket->buffer), &(socket->buffer)[LenOflastRequest], socket->len - LenOflastRequest);
-	//paddind right end with '\0'
-	socket->len -= LenOflastRequest;
-	memset(&(socket->buffer)[socket->len], '\0', SIZE_OF_BUFFER_ARRAY - socket->len);
-}
-
 int putOrPostFile(SocketState* socket, string& filename) {
 	int retCode = 200; // Ok	
 	ofstream outPutFile;
@@ -468,8 +422,7 @@ int putOrPostFile(SocketState* socket, string& filename) {
 
 	string bodyContent = ((string)(socket->buffer)).substr(((string)(socket->buffer)).find("\r\n\r\n") + 4, socket->len);
 
-	if (bodyContent.length() == 0)
-	{
+	if (bodyContent.length() == 0) {
 		retCode = 204; // No content
 	}
 	else {
@@ -493,22 +446,12 @@ bool checkFileExists(string& fname) {
 	}
 }
 
-void addFileToString(ifstream& fileName, string& header)
-{
-	if (fileName.is_open())
-	{
-		string fileContent;
-		char prevChar = 0;
-		char currentChar = fileName.get();
+void copyFileContent2String(ifstream& inFile, string& str) {
+	if (inFile.is_open())	{
+		char currentChar = inFile.get();
 		while (currentChar != EOF)		{
-			fileContent.push_back(currentChar);
-			prevChar = currentChar;
-			currentChar = fileName.get();
+			str.push_back(currentChar);
+			currentChar = inFile.get();
 		}
-		size_t offset = fileContent.length() - 2; //*****
-		if (fileContent.substr(offset) == "\r\n") {
-			fileContent = fileContent.erase(offset);
-		}
-		header.append(fileContent);
 	}
 }
