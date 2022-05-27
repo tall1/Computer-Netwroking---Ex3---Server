@@ -48,25 +48,24 @@ const int httpMethodsLength[] = { 7, 3, 4, 3, 4, 6, 5 };
 
 void handleRequest(SocketState* socket);
 string prepareResponse(SocketState* socket);
-string optionsStringParse(SocketState* socket);
-string createGetOrHeadRespose(SocketState* socket);
-string putStringParse(SocketState* socket);
-string postStringParse(SocketState* socket);
-string deleteStringParse(SocketState* socket);
-string traceStringParse(SocketState* socket);
+string optionsMethod(SocketState* socket);
+string getOrHeadMethod(SocketState* socket);
+string putOrPostMethod(SocketState* socket);
+string deleteMethod(SocketState* socket);
+string traceMethod(SocketState* socket);
 
-string generateResponseHeader(const char* status, int content_length);
+string generateResponseHeaders(const char* status, int content_length);
 string uriExtractor(SocketState* socket);
 int putOrPostFile(SocketState* socket, string& filename);
 bool checkFileExists(string& fname);
 void copyFileContent2String(ifstream& inFile, string& str);
 
 const responseFunction responseFunctionsArr[amountOfHttpMethods] = {
-	optionsStringParse ,
-	createGetOrHeadRespose ,
-	createGetOrHeadRespose ,
-	putStringParse ,
-	postStringParse ,
-	deleteStringParse ,
-	traceStringParse
+	optionsMethod ,
+	getOrHeadMethod ,
+	getOrHeadMethod ,
+	putOrPostMethod ,
+	putOrPostMethod ,
+	deleteMethod ,
+	traceMethod
 };

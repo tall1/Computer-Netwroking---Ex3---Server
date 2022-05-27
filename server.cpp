@@ -198,12 +198,11 @@ void receiveMessage(int index)
 	else
 	{
 		sockets[index].buffer[len + bytesRecv] = '\0'; //add the null-terminating to make it a string
-		cout << "Server: Recieved: " << bytesRecv << " bytes of \n" << &sockets[index].buffer[len] << "\" message.\n";
+		cout << "Server: Recieved: " << bytesRecv << " bytes of: \n" << &sockets[index].buffer[len] << endl;
 
 		sockets[index].len += bytesRecv;
 
-		if (sockets[index].len > 0)
-		{
+		if (sockets[index].len > 0) {
 			handleRequest(&(sockets[index]));
 		}
 	}
@@ -212,13 +211,14 @@ void receiveMessage(int index)
 void sendMessage(int index)
 {
 	int bytesSent = 0;
-	char sendBuff[255] = { 0 };
+	char sendBuff[MAX_SIZE_BUFF] = { 0 };
 
 	SOCKET msgSocket = sockets[index].id;
 	string respond = prepareResponse(&(sockets[index]));
 	sockets[index].len = 0;
 	sprintf(sendBuff, "%s", respond.c_str());
-	
+	cout << "strlen: " << (int)strlen(sendBuff) << endl;
+	cout << "respond.length: " << respond.length() << endl;
 	bytesSent = send(msgSocket, sendBuff, (int)strlen(sendBuff), 0);
 
 	if (SOCKET_ERROR == bytesSent) {
@@ -226,7 +226,7 @@ void sendMessage(int index)
 		return;
 	}
 
-	cout << "Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of \n" << sendBuff << "\ message.\n";
+	cout << "Server: Sent: " << bytesSent << "\\" << strlen(sendBuff) << " bytes of: \n" << sendBuff << "\n============\n";
 	sockets[index].send = IDLE;
 }
 
@@ -234,7 +234,6 @@ void sendMessage(int index)
 // =================================================
 
 void handleRequest(SocketState* socket) {
-	
 	socket->send = SEND;
 	socket->sendSubType = OTHER;
 	for (int i = 0; i < amountOfHttpMethods; i++) {
@@ -249,7 +248,7 @@ void handleRequest(SocketState* socket) {
 string prepareResponse(SocketState* socket) {
 	string response;
 	if (socket->sendSubType == OTHER) {
-		response = generateResponseHeader("400 Bad Request", 0);
+		response = generateResponseHeaders("400 Bad Request", 0);
 	}
 	else {
 		response = responseFunctionsArr[socket->sendSubType](socket);
@@ -257,7 +256,7 @@ string prepareResponse(SocketState* socket) {
 	return response;
 }
 
-string optionsStringParse(SocketState* socket) {
+string optionsMethod(SocketState* socket) {
 	time_t timeRightNow;
 	string header("HTTP/1.1 ");
 	header.append("200 OK");
@@ -266,85 +265,58 @@ string optionsStringParse(SocketState* socket) {
 	time(&timeRightNow);
 	header.append(ctime(&timeRightNow));
 	header.append("Methods that the server supports are: GET, PUT, POST, HEAD, OPTIONS, DELETE, TRACE\r\n");
-	header.append("Content Length: 0\r\n");
-	header.append("Content Type: text or html\r\n");
+	header.append("Content-Length: 0\r\n");
+	header.append("Content-Type: text/html\r\n");
 	header.append("\r\n");
 	return header;
 }
 
-string createGetOrHeadRespose(SocketState* socket) {
+string getOrHeadMethod(SocketState* socket) {
 	string response;
-	ifstream fileName;
+	ifstream inFile;
 	string uri = uriExtractor(socket);
-	fileName.open(uri);
-	if (fileName.fail())
-	{
+	inFile.open(uri);
+	if (inFile.fail()){
 		cout << "Web Server failed to open the file " << uri << "Error code: " << WSAGetLastError() << endl;
-		response = generateResponseHeader("404 Not Found", 0);
+		response = generateResponseHeaders("404 Not Found", 0);
 	}
-	else
-	{
-		cout << "The file " << uri << " is OK" << endl;
+	else {
 		string fileContent = "";
-		copyFileContent2String(fileName, fileContent);
-		response = generateResponseHeader("200 OK", fileContent.length());
-		if (socket->sendSubType == GET) {
+		copyFileContent2String(inFile, fileContent);
+		response = generateResponseHeaders("200 OK", fileContent.length());
+		if (socket->sendSubType == GET) { // on GET => append the content.
 			response.append(fileContent);
 		} 
 	}
-	fileName.close();
+	inFile.close();
 	return response;
 }
 
-string putStringParse(SocketState* socket) {
+string putOrPostMethod(SocketState* socket) {
 	string response;
 	string uri = uriExtractor(socket);
 	int retCode = putOrPostFile(socket, uri);
 	switch (retCode)
 	{
 	case 200:
-		response = generateResponseHeader("200 OK", 0);
+		response = generateResponseHeaders("200 OK", 0);
 		break;
 	case 201:
-		response = generateResponseHeader("201 Created", 0);
+		response = generateResponseHeaders("201 Created", 0);
 		break;
 	case 204:
-		response = generateResponseHeader("204 No Content", 0);
+		response = generateResponseHeaders("204 No Content", 0);
 		break;
 	default:
-		cout << "PUT " << uri << "Failed";
-		response = generateResponseHeader("500 Internal Server Error", 0);
+		cout << (socket->sendSubType == PUT ? "PUT " : "POST ") << uri << "Failed";
+		response = generateResponseHeaders("500 Internal Server Error", 0);
 		break;
 	}
 
 	return response;
 }
 
-string postStringParse(SocketState* socket) {
-	string response;
-	string uri = uriExtractor(socket);
-	int retCode = putOrPostFile(socket, uri);
-	switch (retCode)
-	{
-	case 200:
-		response = generateResponseHeader("200 OK", 0);
-		break;
-	case 201:
-		response = generateResponseHeader("201 Created", 0);
-		break;
-	case 204:
-		response = generateResponseHeader("204 No Content", 0);
-		break;
-	default:
-		cout << "POST " << uri << "Failed";
-		response = generateResponseHeader("500 Internal Server Error", 0);
-		break;
-	}
-
-	return response;
-}
-
-string deleteStringParse(SocketState* socket) {
+string deleteMethod(SocketState* socket) {
 	string response;
 	fstream fileToDelete;
 	string uri = uriExtractor(socket);
@@ -352,28 +324,27 @@ string deleteStringParse(SocketState* socket) {
 	if (fileToDelete.is_open())	{
 		fileToDelete.close();
 		if (remove(uri.c_str()) == 0) {
-			response = generateResponseHeader("200 OK", 0);
+			response = generateResponseHeaders("200 OK", 0);
 		}
 		else {
-			response = generateResponseHeader("500 Internal Server Error", 0);
+			response = generateResponseHeaders("500 Internal Server Error", 0);
 		}
 	}
 	else {
-		response = generateResponseHeader("404 Not Found", 0);
+		response = generateResponseHeaders("404 Not Found", 0);
 	}
-
 	return response;
 }
 
-string traceStringParse(SocketState* socket) {
+string traceMethod(SocketState* socket) {
 	string response;
 	string bodyContent(socket->buffer);
-	response = generateResponseHeader("200 OK", bodyContent.length());
+	response = generateResponseHeaders("200 OK", bodyContent.length());
 	response.append(bodyContent);
 	return response;
 }
 
-string generateResponseHeader(const char* status, int content_length) {
+string generateResponseHeaders(const char* status, int content_length) {
 	time_t timeRightNow;
 	string header("HTTP/1.1 ");
 	header.append(status);
